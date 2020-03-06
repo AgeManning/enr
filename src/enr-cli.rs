@@ -2,7 +2,7 @@
 //! the future.
 
 use clap::{App, Arg};
-use enr::Enr;
+use enr::{DefaultKey, Enr};
 
 fn main() {
     // Parse the CLI parameters.
@@ -52,7 +52,7 @@ fn main() {
 
     let enr = matches
         .value_of("enr")
-        .map(|enr| enr.parse::<Enr>().expect("Invalid ENR"))
+        .map(|enr| enr.parse::<Enr<DefaultKey>>().expect("Invalid ENR"))
         .expect("Must supply an ENR");
 
     if matches.is_present("read") {
@@ -60,7 +60,7 @@ fn main() {
     }
 }
 
-fn print_enr(enr: Enr) {
+fn print_enr(enr: Enr<DefaultKey>) {
     println!("ENR Read");
     println!("Sequence No: {}", enr.seq());
     println!("Node ID: {}", enr.node_id());

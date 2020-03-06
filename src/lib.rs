@@ -86,7 +86,7 @@
 //! let base_64_string = enr.to_base64();
 //!
 //! // decode from base64
-//! let decoded_enr: Enr = base_64_string.parse().unwrap();
+//! let decoded_enr = base_64_string.parse::<Enr<DefaultKey>>().unwrap();
 //!
 //! assert_eq!(decoded_enr.ip(), Some("192.168.0.1".parse().unwrap()));
 //! assert_eq!(decoded_enr.id(), Some("v4".into()));
@@ -125,21 +125,18 @@ use libp2p_core::{
     PeerId,
 };
 
-pub use builder::{EnrBuilder, EnrBuilderRaw};
+pub use builder::EnrBuilder;
 pub use keys::{DefaultKey, DefaultPublicKey, EnrKey, EnrPublicKey};
 pub use node_id::NodeId;
 use std::marker::PhantomData;
 
 const MAX_ENR_SIZE: usize = 300;
 
-/// The default ENR type which implements the standard signing algorithms.
-pub type Enr = EnrRaw<DefaultKey>;
-
 /// The ENR Record.
 ///
 /// This struct will always have a valid signature, known public key type, sequence number and `NodeId`. All other parameters are variable/optional.
 #[derive(Clone, PartialEq, Eq)]
-pub struct EnrRaw<K: EnrKey> {
+pub struct Enr<K: EnrKey> {
     /// ENR sequence number.
     seq: u64,
 
@@ -157,7 +154,7 @@ pub struct EnrRaw<K: EnrKey> {
     phantom: PhantomData<K>,
 }
 
-impl<K: EnrKey> EnrRaw<K> {
+impl<K: EnrKey> Enr<K> {
     // getters //
 
     #[cfg(feature = "libp2p")]
@@ -665,7 +662,7 @@ impl std::fmt::Display for Enr {
 }
 
 #[cfg(not(feature = "libp2p"))]
-impl std::fmt::Display for Enr {
+impl std::fmt::Display for Enr<DefaultKey> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -676,14 +673,14 @@ impl std::fmt::Display for Enr {
     }
 }
 
-impl std::fmt::Debug for Enr {
+impl std::fmt::Debug for Enr<DefaultKey> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.to_base64())
     }
 }
 
 /// Convert a URL-SAFE base64 encoded ENR into an ENR.
-impl<K: EnrKey> FromStr for EnrRaw<K> {
+impl<K: EnrKey> FromStr for Enr<K> {
     type Err = String;
 
     fn from_str(base64_string: &str) -> Result<Self, Self::Err> {
@@ -697,12 +694,12 @@ impl<K: EnrKey> FromStr for EnrRaw<K> {
         }
         let bytes = base64::decode_config(decode_string, base64::URL_SAFE_NO_PAD)
             .map_err(|e| format!("Invalid base64 encoding: {:?}", e))?;
-        rlp::decode::<EnrRaw<K>>(&bytes).map_err(|e| format!("Invalid ENR: {:?}", e))
+        rlp::decode::<Enr<K>>(&bytes).map_err(|e| format!("Invalid ENR: {:?}", e))
     }
 }
 
 #[cfg(feature = "serde")]
-impl<K: EnrKey> Serialize for EnrRaw<K> {
+impl<K: EnrKey> Serialize for Enr<K> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -712,17 +709,17 @@ impl<K: EnrKey> Serialize for EnrRaw<K> {
 }
 
 #[cfg(feature = "serde")]
-impl<'de, K: EnrKey> Deserialize<'de> for EnrRaw<K> {
+impl<'de, K: EnrKey> Deserialize<'de> for Enr<K> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        EnrRaw::<K>::from_str(&s).map_err(D::Error::custom)
+        Enr::<K>::from_str(&s).map_err(D::Error::custom)
     }
 }
 
-impl<K: EnrKey> rlp::Encodable for EnrRaw<K> {
+impl<K: EnrKey> rlp::Encodable for Enr<K> {
     fn rlp_append(&self, s: &mut RlpStream) {
         s.begin_list(self.content.len() * 2 + 2);
         s.append(&self.signature);
@@ -735,7 +732,7 @@ impl<K: EnrKey> rlp::Encodable for EnrRaw<K> {
     }
 }
 
-impl<K: EnrKey> rlp::Decodable for EnrRaw<K> {
+impl<K: EnrKey> rlp::Decodable for Enr<K> {
     fn decode(rlp: &Rlp) -> Result<Self, DecoderError> {
         if !rlp.is_list() {
             debug!("Failed to decode ENR. Not an RLP list: {}", rlp);
@@ -786,7 +783,7 @@ impl<K: EnrKey> rlp::Decodable for EnrRaw<K> {
         // calculate the node id
         let node_id = NodeId::from(public_key);
 
-        let enr = EnrRaw {
+        let enr = Enr {
             seq,
             node_id,
             signature,
@@ -832,7 +829,7 @@ mod tests {
             hex::decode("03ca634cae0d49acb401d8a4c6b6fe8c55b70d115bf400769cc1400f3258cd3138")
                 .unwrap();
 
-        let enr = rlp::decode::<Enr>(&valid_record).unwrap();
+        let enr = rlp::decode::<Enr<DefaultKey>>(&valid_record).unwrap();
 
         let pubkey = enr.public_key().encode();
 
@@ -856,7 +853,7 @@ mod tests {
             hex::decode("a448f24c6d18e575453db13171562b71999873db5b286df957af199ec94617f7")
                 .unwrap();
 
-        let enr: Enr = text.parse::<Enr>().unwrap();
+        let enr = text.parse::<Enr<DefaultKey>>().unwrap();
         let pubkey = enr.public_key().encode();
         assert_eq!(enr.ip(), Some(Ipv4Addr::new(127, 0, 0, 1)));
         dbg!("here");
@@ -880,7 +877,7 @@ mod tests {
     #[test]
     fn test_read_enr() {
         let text = "-Iu4QM-YJF2RRpMcZkFiWzMf2kRd1A5F1GIekPa4Sfi_v0DCLTDBfOMTMMWJhhawr1YLUPb5008CpnBKrgjY3sstjfgCgmlkgnY0gmlwhH8AAAGJc2VjcDI1NmsxoQP8u1uyQFyJYuQUTyA1raXKhSw1HhhxNUQ2VE52LNHWMIN0Y3CCIyiDdWRwgiMo";
-        let enr: Enr = text.parse::<Enr>().unwrap();
+        let enr = text.parse::<Enr<DefaultKey>>().unwrap();
         dbg!(enr.ip());
         dbg!(enr.udp());
         dbg!(enr.tcp());
@@ -924,7 +921,7 @@ mod tests {
 
         let encoded_enr = rlp::encode(&enr);
 
-        let decoded_enr = rlp::decode::<Enr>(&encoded_enr).unwrap();
+        let decoded_enr = rlp::decode::<Enr<DefaultKey>>(&encoded_enr).unwrap();
 
         assert_eq!(decoded_enr.id(), Some("v4".into()));
         assert_eq!(decoded_enr.ip(), Some(ip));
@@ -948,7 +945,7 @@ mod tests {
         };
 
         let encoded_enr = rlp::encode(&enr);
-        let decoded_enr = rlp::decode::<Enr>(&encoded_enr).unwrap();
+        let decoded_enr = rlp::decode::<Enr<DefaultKey>>(&encoded_enr).unwrap();
 
         assert_eq!(decoded_enr.id(), Some("v4".into()));
         assert_eq!(decoded_enr.ip(), Some(ip));
