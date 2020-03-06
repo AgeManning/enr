@@ -135,7 +135,7 @@ const MAX_ENR_SIZE: usize = 300;
 /// The ENR Record.
 ///
 /// This struct will always have a valid signature, known public key type, sequence number and `NodeId`. All other parameters are variable/optional.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub struct Enr<K: EnrKey> {
     /// ENR sequence number.
     seq: u64,
@@ -164,8 +164,8 @@ impl<K: EnrKey> Enr<K> {
     }
 
     /// The `NodeId` for the record.
-    pub fn node_id(&self) -> &NodeId {
-        &self.node_id
+    pub fn node_id(&self) -> NodeId {
+        self.node_id
     }
 
     /// The current sequence number of the ENR record.
@@ -648,8 +648,20 @@ impl<K: EnrKey> Enr<K> {
 
 // traits //
 
+impl<K: EnrKey> Clone for Enr<K> {
+    fn clone(&self) -> Self {
+        Self {
+            seq: self.seq,
+            node_id: self.node_id,
+            content: self.content.clone(),
+            signature: self.signature.clone(),
+            phantom: self.phantom,
+        }
+    }
+}
+
 #[cfg(feature = "libp2p")]
-impl std::fmt::Display for Enr {
+impl<K: EnrKey> std::fmt::Display for Enr<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -662,7 +674,7 @@ impl std::fmt::Display for Enr {
 }
 
 #[cfg(not(feature = "libp2p"))]
-impl std::fmt::Display for Enr<DefaultKey> {
+impl<K: EnrKey> std::fmt::Display for Enr<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(
             f,
@@ -673,7 +685,7 @@ impl std::fmt::Display for Enr<DefaultKey> {
     }
 }
 
-impl std::fmt::Debug for Enr<DefaultKey> {
+impl<K: EnrKey> std::fmt::Debug for Enr<K> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{}", self.to_base64())
     }
@@ -1008,11 +1020,11 @@ mod tests {
             builder.build(&key).unwrap()
         };
 
-        let node_id = enr.node_id().clone();
+        let node_id = enr.node_id();
 
         enr.set_udp_socket("192.168.0.1:800".parse::<SocketAddr>().unwrap(), &key)
             .unwrap();
-        assert_eq!(node_id, *enr.node_id());
+        assert_eq!(node_id, enr.node_id());
         assert_eq!(
             enr.udp_socket(),
             "192.168.0.1:800".parse::<SocketAddr>().unwrap().into()
