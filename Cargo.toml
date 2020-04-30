@@ -34,7 +34,6 @@ c-secp256k1 = { package = "secp256k1", features = ["rand-std"], version = "0.17"
 
 [features]
 default = ["serde", "libsecp256k1" ]
-libp2p = ["libp2p-core"]
 ed25519 = ["ed25519-dalek"]
 rust-secp256k1 = ["c-secp256k1"]
 
