@@ -1,6 +1,8 @@
 enr
 ============
 
+## This repository has been moved to [rust-ethereum](https://github.com/rust-ethereum/enr)
+
 [![Build Status]][Build Link] [![Doc Status]][Doc Link] [![Crates
 Status]][Crates Link]
 
